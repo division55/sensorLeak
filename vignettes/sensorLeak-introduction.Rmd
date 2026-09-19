@@ -1,0 +1,196 @@
+---
+title: "Introduction to sensorLeak"
+author: "sensorLeak authors"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to sensorLeak}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\usepackage[utf8]{inputenc}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+
+library(sensorLeak)
+```
+
+# Introduction
+
+Environmental sensor data are commonly used in machine learning
+workflows for prediction and forecasting. However, the way observations
+are divided into training and testing data can introduce validation
+risks.
+
+`sensorLeak` provides diagnostic tools for identifying several
+potential sources of information leakage or overly optimistic
+validation:
+
+- temporal ordering problems
+- sensors shared between training and testing data
+- spatially close observations
+- overlapping temporal windows
+
+The package reports potential risks rather than automatically declaring
+a dataset invalid. Whether a detected condition represents leakage
+depends on the intended generalization target of the model.
+
+# Example data
+
+The package includes a small synthetic environmental sensor dataset.
+
+```{r}
+data(sensor_data)
+
+head(sensor_data)
+```
+
+The dataset contains timestamps, sensor identifiers, geographic
+coordinates, PM2.5 measurements, and train/test assignments.
+
+# Running an audit
+
+The `sensor_audit()` function combines several checks into a single
+audit object.
+
+```{r}
+audit <- sensor_audit(
+  sensor_data,
+  time = "timestamp",
+  sensor = "sensor_id",
+  split = "split",
+  lat = "latitude",
+  lon = "longitude"
+)
+```
+
+The audit can be printed directly:
+
+```{r}
+audit
+```
+
+A more detailed summary is available with:
+
+```{r}
+summary(audit)
+```
+
+# Temporal leakage
+
+Temporal validation should respect the intended direction of time.
+
+The temporal check identifies test observations that occur at or before
+the end of the training period.
+
+```{r}
+check_temporal_leakage(
+  sensor_data,
+  time = "timestamp",
+  split = "split"
+)
+```
+
+A detected observation does not necessarily mean the workflow is
+incorrect. For example, different validation strategies may have
+different temporal requirements.
+
+# Shared sensors
+
+The sensor check identifies sensors that occur in both training and
+testing observations.
+
+```{r}
+check_sensor_leakage(
+  sensor_data,
+  sensor = "sensor_id",
+  split = "split"
+)
+```
+
+Shared sensors can be appropriate when the intended task is to predict
+future observations from known sensors.
+
+However, if the intended goal is to generalize to completely unseen
+sensors, shared sensors may represent a validation risk.
+
+# Spatial proximity
+
+Environmental observations that are geographically close may contain
+similar environmental conditions.
+
+`sensorLeak` can identify training/testing observation pairs within a
+specified geographic distance.
+
+```{r}
+check_spatial_leakage(
+  sensor_data,
+  lat = "latitude",
+  lon = "longitude",
+  split = "split",
+  threshold = 1
+)
+```
+
+The threshold is specified in kilometres.
+
+Spatial proximity should be interpreted according to the intended
+spatial generalization of the model.
+
+# Overlapping temporal windows
+
+Some environmental workflows use rolling, aggregation, or observation
+windows.
+
+If a training window and a testing window overlap for the same sensor,
+information from the same time interval may occur in both datasets.
+
+This can be checked with:
+
+```{r}
+window_data <- data.frame(
+  sensor_id = c("S1", "S1"),
+  window_start = as.POSIXct(c(
+    "2026-01-01 10:00:00",
+    "2026-01-01 13:00:00"
+  )),
+  window_end = as.POSIXct(c(
+    "2026-01-01 14:00:00",
+    "2026-01-01 18:00:00"
+  )),
+  split = c("train", "test")
+)
+
+check_window_leakage(
+  window_data,
+  start = "window_start",
+  end = "window_end",
+  split = "split",
+  sensor = "sensor_id"
+)
+```
+
+# Interpreting audit results
+
+`sensorLeak` is intended as a diagnostic tool.
+
+A reported finding should be interpreted in the context of:
+
+1. the prediction task,
+2. the intended generalization target,
+3. the temporal structure of the data,
+4. the spatial structure of the study,
+5. and the way features were constructed.
+
+The package does not replace domain-specific decisions about how
+training and testing data should be separated.
+
+# Conclusion
+
+`sensorLeak` provides a lightweight way to audit environmental sensor
+machine learning datasets for several potential validation risks.
+
+The individual checks can be used independently, while
+`sensor_audit()` provides a convenient combined interface.
