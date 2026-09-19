@@ -3,6 +3,7 @@
 
 <!-- badges: start -->
 
+[![R-CMD-check](https://github.com/division55/sensorLeak/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/division55/sensorLeak/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
 `sensorLeak` provides tools for identifying potential validation and
@@ -19,7 +20,7 @@ You can install the development version of `sensorLeak` from GitHub:
 
 ``` r
 # install.packages("pak")
-pak::pak("YOUR-GITHUB-USERNAME/sensorLeak")
+pak::pak("division55/sensorLeak")
 ```
 
 ## Example
