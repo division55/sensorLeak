@@ -94,54 +94,87 @@ check_spatial_leakage <- function(
     ))
   }
 
-  haversine_distance <- function(
-    lat1,
-    lon1,
-    lat2,
-    lon2) {
+  spatial_pairs_within(
+    lat = data[[lat]],
+    lon = data[[lon]],
+    train_rows = train_rows,
+    test_rows = test_rows,
+    threshold = threshold
+  )
+}
 
-    radius <- 6371
+#' Find train/test pairs within a distance threshold
+#'
+#' Computes haversine distances between every training and testing
+#' observation in blocks, so memory use stays bounded, and returns the
+#' pairs within `threshold` kilometres, ordered by `train_row` and then
+#' `test_row`.
+#'
+#' @param lat,lon Numeric vectors of latitude and longitude in degrees,
+#'   one element per row of the original data.
+#' @param train_rows,test_rows Integer row indices of the training and
+#'   testing observations.
+#' @param threshold Maximum distance in kilometres.
+#' @param max_cells Approximate maximum size of one distance matrix.
+#'
+#' @return A data frame with columns `train_row`, `test_row`, and
+#'   `distance_km`.
+#'
+#' @noRd
+spatial_pairs_within <- function(
+    lat,
+    lon,
+    train_rows,
+    test_rows,
+    threshold,
+    max_cells = 2e6) {
 
-    lat1 <- lat1 * pi / 180
-    lat2 <- lat2 * pi / 180
-    dlat <- lat2 - lat1
-    dlon <- (lon2 - lon1) * pi / 180
+  radius <- 6371
+
+  lat_train <- lat[train_rows] * pi / 180
+  lon_train <- lon[train_rows]
+  lat_test <- lat[test_rows] * pi / 180
+  lon_test <- lon[test_rows]
+
+  cos_test <- cos(lat_test)
+
+  block_size <- max(1L, floor(max_cells / length(test_rows)))
+  starts <- seq(1L, length(train_rows), by = block_size)
+
+  blocks <- lapply(starts, function(start) {
+
+    idx <- start:min(start + block_size - 1L, length(train_rows))
+
+    dlat <- outer(lat_train[idx], lat_test, function(a, b) b - a)
+    dlon <- outer(
+      lon_train[idx],
+      lon_test,
+      function(a, b) (b - a) * pi / 180
+    )
 
     a <- sin(dlat / 2)^2 +
-      cos(lat1) * cos(lat2) * sin(dlon / 2)^2
+      outer(cos(lat_train[idx]), cos_test) * sin(dlon / 2)^2
 
-    2 * radius * asin(sqrt(a))
-  }
+    distance <- 2 * radius * asin(sqrt(pmin(a, 1)))
 
-  results <- list()
+    hits <- which(distance <= threshold, arr.ind = TRUE)
 
-  for (i in seq_along(train_rows)) {
-
-    train_row <- train_rows[i]
-
-    for (j in seq_along(test_rows)) {
-
-      test_row <- test_rows[j]
-
-      distance <- haversine_distance(
-        data[[lat]][train_row],
-        data[[lon]][train_row],
-        data[[lat]][test_row],
-        data[[lon]][test_row]
-      )
-
-      if (distance <= threshold) {
-
-        results[[length(results) + 1]] <- data.frame(
-          train_row = train_row,
-          test_row = test_row,
-          distance_km = distance
-        )
-      }
+    if (nrow(hits) == 0) {
+      return(NULL)
     }
-  }
 
-  if (length(results) == 0) {
+    hits <- hits[order(hits[, 1], hits[, 2]), , drop = FALSE]
+
+    data.frame(
+      train_row = train_rows[idx[hits[, 1]]],
+      test_row = test_rows[hits[, 2]],
+      distance_km = distance[hits]
+    )
+  })
+
+  blocks <- blocks[!vapply(blocks, is.null, logical(1))]
+
+  if (length(blocks) == 0) {
     return(data.frame(
       train_row = integer(),
       test_row = integer(),
@@ -149,5 +182,8 @@ check_spatial_leakage <- function(
     ))
   }
 
-  do.call(rbind, results)
+  result <- do.call(rbind, blocks)
+  rownames(result) <- NULL
+
+  result
 }
