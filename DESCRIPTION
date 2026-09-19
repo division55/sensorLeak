@@ -7,13 +7,13 @@ Authors@R:
         "Divya",
         "Umai Raja",
         email = "iamuayvid@gmail.com",
-        role = c("aut", "cre")
+        role = c("aut", "cre", "cph")
       ),
       person(
         "Sanjana",
         "Sujil",
         email = "sanjanasujil17@gmail.com",
-        role = "aut"
+         role = c("aut","cph")
       )
     )
 Description: >
