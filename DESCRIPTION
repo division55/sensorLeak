@@ -11,8 +11,8 @@ Authors@R:
       ),
       person(
         "Sanjana",
-        "Sujill",
-        email = "THEIR EMAIL",
+        "Sujil",
+        email = "sanjanasujil17@gmail.com",
         role = "aut"
       )
     )
