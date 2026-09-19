@@ -1,3 +1,7 @@
+# sensorLeak (development version)
+
+* `check_spatial_leakage()` now computes train/test distances in blocks with vectorized haversine calculations instead of a pair-by-pair loop. Results are unchanged, and memory use stays bounded on larger datasets.
+
 # sensorLeak 0.1.0
 
 ## Initial release
